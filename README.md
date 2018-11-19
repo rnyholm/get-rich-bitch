@@ -5,7 +5,7 @@ Experimental project which objectives are to fetch information from some predefi
 
 ### Fetching stock information
 The script `stock-price-fetcher.py` fetches prices and other stock info from a set of predefined tickers. 
-These tickers are set under `conf/` and are named as `market.stx`, eg. definition file for Helsinki market tickers will be named as `hel.stx`. This file is configured as 'one-ticker-per-row'.
+These tickers are set in files named as `market.stx`, eg. definition file for Helsinki market tickers will be named as `hel.stx`. This file is configured as 'one-ticker-per-row'.
 Since this script uses the module https://github.com/JECSand/yahoofinancials for alla data fetchong from Yahoo, it's necessary that the tickers are named in a way that Yahoo can interpret.
 
 This script is triggered by a cron job and could be configured like someting like this
