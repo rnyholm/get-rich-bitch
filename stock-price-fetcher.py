@@ -4,8 +4,8 @@ import time
 import threading
 
 from yahoofinancials import YahooFinancials
-STOCK_FILES = [ '/usr/local/bin/get-rich-bitch/hel.stx' ]
-LOG_FILE = '/usr/local/bin/get-rich-bitch/stock.log'
+STOCK_FILES = [ '/usr/local/bin/get-rich-bitch/conf/hel.stx' ]
+LOG_FILE = '/usr/local/bin/get-rich-bitch/log/stock.log'
 STOCK_INFO_FETCHER_THREADS = 12
 
 #Timezone offset
