@@ -23,7 +23,7 @@ LOG_SEVERITY_WARNING = 'WARNING'
 LOG_SEVERITY_ERROR = 'ERROR'
 
 # Threading
-STOCK_INFO_FETCHER_THREADS = 5
+STOCK_INFO_FETCHER_THREADS = 12
 
 #Timezone offset
 os.environ['TZ'] = 'Europe/Helsinki'
