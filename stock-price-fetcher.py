@@ -2,53 +2,130 @@
 import os
 import time
 import threading
+import MySQLdb
 
 from yahoofinancials import YahooFinancials
-STOCK_FILES = [ '/usr/local/bin/get-rich-bitch/conf/hel.stx' ]
-LOG_FILE = '/usr/local/bin/get-rich-bitch/log/stock.log'
-STOCK_INFO_FETCHER_THREADS = 12
+# Database connection
+SQL_HOST = '35.231.26.118'
+SQL_USER = 'petroleum'
+SQL_PSWD = 'petroleum'
+SQL_DB = 'stockdata'
+
+# File locations
+DIRNAME = os.path.dirname(__file__)
+STOCK_FILES = [ DIRNAME + '/conf/hel.stx' ]
+SCRIPT_LOG_FILE = DIRNAME + '/log/script.log'
+SQL_LOG_FILE = DIRNAME + '/log/sql.log'
+
+# Log severitys
+LOG_SEVERITY_INFO = 'INFORMATION'
+LOG_SEVERITY_WARNING = 'WARNING'
+LOG_SEVERITY_ERROR = 'ERROR'
+
+# Threading
+STOCK_INFO_FETCHER_THREADS = 5
 
 #Timezone offset
 os.environ['TZ'] = 'Europe/Helsinki'
 time.tzset()
 
 # Script functions and classes declaration
-def log_stock_info(stock, stock_info):
-        currency = stock_info.get_currency()
-        # Just log for now..
-        with open(LOG_FILE, 'a') as log:
-                log.write(time.asctime(time.localtime(time.time())))
-                log.write('\t')
-                log.write(str(stock_info.get_stock_exchange()))
-                log.write('\t')
-		log.write(stock)
-                log.write('\t')
-                log.write(str(stock_info.get_market_cap()))
-                log.write('\t')
-                log.write(str(stock_info.get_prev_close_price()) + currency)
-                log.write('\t')
-                log.write(str(stock_info.get_open_price()) + currency)
-                log.write('\t')
-                log.write(str(stock_info.get_current_price()) + currency)
-                log.write('\t')
-                log.write(str(round(stock_info.get_current_change())) + currency)
-                log.write('(' + str(round(stock_info.get_current_percent_change()*100, 2)) + '%)\n')
+def log(log_file, severity, message):
+	with open(log_file, 'a') as log:
+		log.write(time.asctime(time.localtime(time.time())))
+		log.write('\t')
+		log.write('[' + severity + ']')
+		log.write('\t')
+		log.write(message)
+		log.write('\n')
 
-def fetch_and_log_stocks(thread_id, stocks):
+def connect_to_database(thread_id):
+	db = MySQLdb.connect(host=SQL_HOST, user=SQL_USER, passwd=SQL_PSWD, db=SQL_DB)
+	log(SCRIPT_LOG_FILE, LOG_SEVERITY_INFO, 'Thread: ' + thread_id + ', connected to database: ' + SQL_DB + ', on host: ' + SQL_HOST + str(db))
+	return db
+
+def close_connection_to_database(thread_id, db):
+	db.close()
+	log(SCRIPT_LOG_FILE, LOG_SEVERITY_INFO, 'Thread: ' + thread_id + ', closed connection to database: ' + SQL_DB + ', on host: ' + SQL_HOST)
+
+def get_timestamp_for_db():
+	now = time.localtime(time.time())
+	return str(time.strftime("%Y-%m-%d %H:%M:%S", now))
+
+def get_timestamp_for_db_query():
+	now = time.localtime(time.time())
+	return str(time.strftime("%Y-%m-%d", now)) + '%'
+
+def create_query(query, arguments):
+	return query.format(*arguments)
+
+def execute_sql_with_logging(cursor, sql):
+	log(SQL_LOG_FILE, LOG_SEVERITY_INFO, 'Executing sql: ' + sql)
+	return cursor.execute(sql)
+
+def store_stock_info(db, stock, stock_info):
+	cursor = db.cursor()
+
+	sql = "SELECT * FROM markets WHERE market = '{}'".format(stock_info.get_stock_exchange())
+	number_of_markets = execute_sql_with_logging(cursor,sql) # Maximum one result row due to PK constraint in markets table
+	if (number_of_markets == 0):
+		sql = "INSERT INTO markets VALUES('{}')".format(stock_info.get_stock_exchange())
+		execute_sql_with_logging(cursor, sql)
+		db.commit()
+
+    	sql = "SELECT * FROM stocks WHERE ticker = '{}'".format(stock)
+	number_of_stocks = execute_sql_with_logging(cursor, sql)
+	if (number_of_stocks == 0):
+		sql = "INSERT INTO stocks VALUES('{}', '{}', '{}')".format(stock, stock_info.get_stock_exchange(), stock_info.get_market_cap())
+		execute_sql_with_logging(cursor, sql)
+		db.commit()
+	else: # Maximum one result row due to PK constraing in stocks table
+		sql = "UPDATE stocks SET market = '{}', marketcap = '{}' WHERE ticker = '{}'".format(stock_info.get_stock_exchange(), stock_info.get_market_cap(), stock)
+		execute_sql_with_logging(cursor, sql)
+		db.commit()
+
+	sql = "SELECT * FROM stocks s JOIN prices p ON s.ticker = p.ticker WHERE s.ticker = '{}' AND p.date LIKE '{}'".format(stock, get_timestamp_for_db_query())
+	number_of_prices = execute_sql_with_logging(cursor, sql)
+	if (number_of_prices == 0): # Doesn't exist any prices, insert fresh ones
+		sql = "INSERT INTO prices (ticker, date, previousclose, open, daytrend) VALUES('{}', '{}', {}, {}, '{}')" \
+		.format(stock, get_timestamp_for_db(), stock_info.get_prev_close_price(), stock_info.get_open_price(), stock_info.get_current_price())
+		execute_sql_with_logging(cursor, sql)
+		db.commit()
+	elif (number_of_prices == 1): # Update prices
+		stock_and_prices_result = cursor.fetchall()
+		stock_and_prices = stock_and_prices_result[0] # Should be exactly one!
+		daytrend =  str(stock_and_prices[8]) + ';{}'.format(stock_info.get_current_price())
+		sql = "UPDATE prices SET date = '{}', previousclose = {}, open = {}, daytrend = '{}' WHERE id = {}"	\
+		.format(get_timestamp_for_db(), stock_info.get_prev_close_price(), stock_info.get_open_price(), daytrend, stock_and_prices[3])
+		execute_sql_with_logging(cursor, sql)
+		db.commit()
+	else: # This is wrong, we should only have exactly one result row
+		log(SQL_LOG_FILE, LOG_SEVERITY_ERROR, 'There exists more than one price-row for ticker: ' + stock + ' and date: ' + get_timestamp_for_db)
+
+def fetch_and_store_stock_info(thread_id, db, stocks):
 	for stock in stocks:
-		print 'Thread \"' + thread_id + '\" fetching stock info for ticker -> ' + stock
+		log(SCRIPT_LOG_FILE, LOG_SEVERITY_INFO, 'Thread ' + thread_id + ' fetching stock info for ticker: ' + stock)
 		stock_info = YahooFinancials(stock)
-		log_stock_info(stock, stock_info)
+		stock_exchange = stock_info.get_stock_exchange()
+		if (stock_exchange == 'none') or (stock_exchange == 'None') or (stock_exchange == 'NONE'):
+			log(SCRIPT_LOG_FILE, LOG_SEVERITY_ERROR, 'Unable to store stock information for ticker: ' + stock + ', missing stock exchange')
+		else:
+			store_stock_info(db, stock, stock_info)
 
-class StockFetcherThread (threading.Thread):
+def start_stock_info_fetching(thread_id, stocks):
+	log(SCRIPT_LOG_FILE, LOG_SEVERITY_INFO, 'Starting thread-id: ' + thread_id)
+	db = connect_to_database(thread_id)
+	fetch_and_store_stock_info(thread_id, db, stocks)
+	close_connection_to_database(thread_id, db)
+	log(SCRIPT_LOG_FILE, LOG_SEVERITY_INFO, 'Exiting thread-id: ' + thread_id)
+
+class StockFetcherThread(threading.Thread):
 	def __init__(self, thread_id, stocks):
 		threading.Thread.__init__(self)
 		self.thread_id = thread_id
 		self.stocks = stocks
 	def run(self):
-		print 'Starting thread-id: ' + self.thread_id
-		fetch_and_log_stocks(self.thread_id, self.stocks)
-		print 'Exiting thread-id:' + self.thread_id
+		start_stock_info_fetching(self.thread_id, self.stocks)
 
 # Main script
 for stock_file in STOCK_FILES:
@@ -59,7 +136,6 @@ for stock_file in STOCK_FILES:
 
 number_of_stocks = len(stocks)
 thread_working_size = number_of_stocks//STOCK_INFO_FETCHER_THREADS
-
 if (thread_working_size >= 2):
 	thread_count = 0
 	while thread_count < STOCK_INFO_FETCHER_THREADS:
@@ -71,8 +147,7 @@ if (thread_working_size >= 2):
 
 		thread = StockFetcherThread('t' + str(thread_count), thread_stocks)
 		thread.start()
-		
+
 		thread_count = thread_count + 1
 else:
-	fetch_and_log_stocks('main', stocks)
-
+	start_stock_info_fetching('main', stocks)
