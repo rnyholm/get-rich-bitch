@@ -14,6 +14,7 @@ SQL_DB = 'stockdata'
 # File locations
 DIRNAME = os.path.dirname(__file__)
 STOCK_FILES = [ DIRNAME + '/conf/hel.stx' ]
+INDICES_FILE = DIRNAME + '/conf/indices.stx'
 SCRIPT_LOG_FILE = DIRNAME + '/log/script.log'
 SQL_LOG_FILE = DIRNAME + '/log/sql.log'
 
@@ -102,6 +103,45 @@ def store_stock_info(db, stock, stock_info):
 	else: # This is wrong, we should only have exactly one result row
 		log(SQL_LOG_FILE, LOG_SEVERITY_ERROR, 'There exists more than one price-row for ticker: ' + stock + ' and date: ' + get_timestamp_for_db)
 
+def store_index_info(db, index, index_info):
+	cursor = db.cursor()
+
+	sql = "SELECT * FROM markets WHERE market = '{}'".format(index_info.get_stock_exchange())
+        number_of_markets = execute_sql_with_logging(cursor,sql) # Maximum one result row due to PK constraint in markets table
+        if (number_of_markets == 0):
+                sql = "INSERT INTO markets VALUES('{}')".format(index_info.get_stock_exchange())
+                execute_sql_with_logging(cursor, sql)
+                db.commit()
+	
+        sql = "SELECT * FROM indices i WHERE i.index = '{}'".format(index)
+        number_of_indices = execute_sql_with_logging(cursor, sql)
+        if (number_of_indices == 0):
+                sql = "INSERT INTO indices VALUES('{}', '{}')".format(index, index_info.get_stock_exchange())
+                execute_sql_with_logging(cursor, sql)
+                db.commit()
+        else: # Maximum one result row due to PK constraing in index table
+                sql = "UPDATE indices i SET market = '{}' WHERE i.index = '{}'".format(index_info.get_stock_exchange(), index)
+                execute_sql_with_logging(cursor, sql)
+                db.commit()
+
+        sql = "SELECT * FROM indices i JOIN prices p ON i.index = p.index WHERE i.index = '{}' AND p.date LIKE '{}'".format(index, get_timestamp_for_db_query())
+        number_of_prices = execute_sql_with_logging(cursor, sql)
+        if (number_of_prices == 0): # Doesn't exist any prices, insert fresh ones
+		sql = "INSERT INTO prices (`index`, date, previousclose, open, daytrend) VALUES('{}', '{}', {}, {}, '{}')" \
+                .format(index, get_timestamp_for_db(), index_info.get_prev_close_price(), index_info.get_open_price(), index_info.get_current_price())
+                execute_sql_with_logging(cursor, sql)
+                db.commit()
+        elif (number_of_prices == 1): # Update prices
+                index_and_prices_result = cursor.fetchall()
+                index_and_prices = index_and_prices_result[0] # Should be exactly one!
+                daytrend =  str(index_and_prices[7]) + ';{}'.format(index_info.get_current_price())
+                sql = "UPDATE prices p  SET p.date = '{}', p.previousclose = {}, p.open = {}, p.daytrend = '{}' WHERE id = {}"     \
+                .format(get_timestamp_for_db(), index_info.get_prev_close_price(), index_info.get_open_price(), daytrend, index_and_prices[2])
+                execute_sql_with_logging(cursor, sql)
+                db.commit()
+        else: # This is wrong, we should only have exactly one result row
+                log(SQL_LOG_FILE, LOG_SEVERITY_ERROR, 'There exists more than one price-row for index: ' + index + ' and date: ' + get_timestamp_for_db)
+
 def fetch_and_store_stock_info(thread_id, db, stocks):
 	for stock in stocks:
 		log(SCRIPT_LOG_FILE, LOG_SEVERITY_INFO, 'Thread ' + thread_id + ' fetching stock info for ticker: ' + stock)
@@ -112,10 +152,27 @@ def fetch_and_store_stock_info(thread_id, db, stocks):
 		else:
 			store_stock_info(db, stock, stock_info)
 
+def fetch_and_store_index_info(thread_id, db, indices):
+	for index in indices:
+		log(SCRIPT_LOG_FILE, LOG_SEVERITY_INFO, 'Thread ' + thread_id + ' fetching info for index: ' + index)
+		index_info = YahooFinancials(index)
+		stock_exchange = index_info.get_stock_exchange()
+                if (stock_exchange == 'none') or (stock_exchange == 'None') or (stock_exchange == 'NONE'):
+                        log(SCRIPT_LOG_FILE, LOG_SEVERITY_ERROR, 'Unable to store index information for: ' + stock + ', missing stock exchange')
+                else:
+			store_index_info(db, index, index_info)
+
 def start_stock_info_fetching(thread_id, stocks):
 	log(SCRIPT_LOG_FILE, LOG_SEVERITY_INFO, 'Starting thread-id: ' + thread_id)
 	db = connect_to_database(thread_id)
 	fetch_and_store_stock_info(thread_id, db, stocks)
+	close_connection_to_database(thread_id, db)
+	log(SCRIPT_LOG_FILE, LOG_SEVERITY_INFO, 'Exiting thread-id: ' + thread_id)
+
+def start_index_info_fetching(thread_id, indices):
+	log(SCRIPT_LOG_FILE, LOG_SEVERITY_INFO, 'Starting thread-id: ' + thread_id)
+	db = connect_to_database(thread_id)
+	fetch_and_store_index_info(thread_id, db, indices)
 	close_connection_to_database(thread_id, db)
 	log(SCRIPT_LOG_FILE, LOG_SEVERITY_INFO, 'Exiting thread-id: ' + thread_id)
 
@@ -134,6 +191,13 @@ for stock_file in STOCK_FILES:
 		for line in current_stock_file:
 			stocks.append(line.strip('\n'))
 
+with open(INDICES_FILE, 'r') as indices_file:
+	indices = []
+	for line in indices_file:
+		indices.append(line.strip('\n'))
+
+start_index_info_fetching('main', indices)
+
 number_of_stocks = len(stocks)
 thread_working_size = number_of_stocks//STOCK_INFO_FETCHER_THREADS
 if (thread_working_size >= 2):
@@ -151,3 +215,5 @@ if (thread_working_size >= 2):
 		thread_count = thread_count + 1
 else:
 	start_stock_info_fetching('main', stocks)
+
+
