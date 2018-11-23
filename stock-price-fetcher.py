@@ -95,7 +95,7 @@ def store_stock_info(db, stock, stock_info):
 	elif (number_of_prices == 1): # Update prices
 		stock_and_prices_result = cursor.fetchall()
 		stock_and_prices = stock_and_prices_result[0] # Should be exactly one!
-		daytrend =  str(stock_and_prices[8]) + ';{}'.format(stock_info.get_current_price())
+		daytrend =  str(stock_and_prices[9]) + ';{}'.format(stock_info.get_current_price())
 		sql = "UPDATE prices SET date = '{}', previousclose = {}, open = {}, daytrend = '{}' WHERE id = {}"	\
 		.format(get_timestamp_for_db(), stock_info.get_prev_close_price(), stock_info.get_open_price(), daytrend, stock_and_prices[3])
 		execute_sql_with_logging(cursor, sql)
@@ -134,7 +134,7 @@ def store_index_info(db, index, index_info):
         elif (number_of_prices == 1): # Update prices
                 index_and_prices_result = cursor.fetchall()
                 index_and_prices = index_and_prices_result[0] # Should be exactly one!
-                daytrend =  str(index_and_prices[7]) + ';{}'.format(index_info.get_current_price())
+                daytrend =  str(index_and_prices[8]) + ';{}'.format(index_info.get_current_price())
                 sql = "UPDATE prices p  SET p.date = '{}', p.previousclose = {}, p.open = {}, p.daytrend = '{}' WHERE id = {}"     \
                 .format(get_timestamp_for_db(), index_info.get_prev_close_price(), index_info.get_open_price(), daytrend, index_and_prices[2])
                 execute_sql_with_logging(cursor, sql)
