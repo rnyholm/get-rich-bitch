@@ -27,7 +27,7 @@ CREATE TABLE `prices` (
   `date` datetime DEFAULT NULL,
   `previousclose` decimal(10,4) DEFAULT NULL,
   `open` decimal(10,4) DEFAULT NULL,
-  `daytrend` varchar(1000) DEFAULT NULL,
+  `daytrend` varchar(1500) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `fk_prices_stocks` (`ticker`),
   CONSTRAINT `fk_prices_stocks` FOREIGN KEY (`ticker`) REFERENCES `stocks` (`ticker`),
