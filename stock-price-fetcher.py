@@ -41,13 +41,21 @@ def log(log_file, severity, message):
 		log.write('\n')
 
 def connect_to_database(thread_id):
-	db = MySQLdb.connect(host=SQL_HOST, user=SQL_USER, passwd=SQL_PSWD, db=SQL_DB)
-	log(SCRIPT_LOG_FILE, LOG_SEVERITY_INFO, 'Thread: ' + thread_id + ', connected to database: ' + SQL_DB + ', on host: ' + SQL_HOST + str(db))
-	return db
+	try:
+		db = MySQLdb.connect(host=SQL_HOST, user=SQL_USER, passwd=SQL_PSWD, db=SQL_DB)
+		log(SCRIPT_LOG_FILE, LOG_SEVERITY_INFO, 'Thread: ' + thread_id + ', connected to database: ' + SQL_DB + ', on host: ' + SQL_HOST + str(db))
+		return db
+	except Exception as e:
+		log(SCRIPT_LOG_FILE, LOG_SEVERITY_ERROR, 'Thread: ' + thread_id + ', failed to connect to database: ' + SQL_DB + ', on host: ' + SQL_HOST + str(db))
+		log(SCRIPT_LOG_FILE, LOG_SEVERITY_ERROR, 'Exception -> ' + e)
 
 def close_connection_to_database(thread_id, db):
-	db.close()
-	log(SCRIPT_LOG_FILE, LOG_SEVERITY_INFO, 'Thread: ' + thread_id + ', closed connection to database: ' + SQL_DB + ', on host: ' + SQL_HOST)
+	try:
+		db.close()
+		log(SCRIPT_LOG_FILE, LOG_SEVERITY_INFO, 'Thread: ' + thread_id + ', closed connection to database: ' + SQL_DB + ', on host: ' + str(SQL_HOST))
+	except Exception as e:
+		log(SCRIPT_LOG_FILE, LOG_SEVERITY_ERROR, 'Thread: ' + thread_id + ', failed to close the connection to database: ' + SQL_DB + ', on host: ' + SQL_HOST + str(db))
+                log(SCRIPT_LOG_FILE, LOG_SEVERITY_ERROR, 'Exception -> ' + e)
 
 def get_timestamp_for_db():
 	now = time.localtime(time.time())
@@ -61,8 +69,12 @@ def create_query(query, arguments):
 	return query.format(*arguments)
 
 def execute_sql_with_logging(cursor, sql):
-	log(SQL_LOG_FILE, LOG_SEVERITY_INFO, 'Executing sql: ' + sql)
-	return cursor.execute(sql)
+	try:
+		log(SQL_LOG_FILE, LOG_SEVERITY_INFO, 'Executing sql: ' + sql)
+		return cursor.execute(sql)
+	except Exception as e:
+		log(SCRIPT_LOG_FILE, LOG_SEVERITY_ERROR, 'Failed to execute SQL-query: ' + sql)
+                log(SCRIPT_LOG_FILE, LOG_SEVERITY_ERROR, 'Exception -> ' + e)
 
 def store_stock_info(db, stock, stock_info):
 	cursor = db.cursor()
