@@ -44,7 +44,7 @@ def fetch_and_handle_index_info(thread_id, db, indices):
 		index_info = YahooFinancials(index)
 		stock_exchange = ''
 		try:
-			stock_exchange = stock_info.get_stock_exchange()
+			stock_exchange = index_info.get_stock_exchange()
 		except Exception as e:
 			log.error(log.FETCHER_SCRIPT_LOG_FILE, 'Thread ' + thread_id + ' was unable to store index information for: ' + index + ', failed to resolve index exchange')
 			log.error(log.FETCHER_SCRIPT_LOG_FILE, 'Exception: ' + str(e))
