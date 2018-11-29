@@ -28,22 +28,28 @@ def fetch_and_handle_stock_info(thread_id, db, stocks):
 	for stock in stocks:
 		log.info(log.FETCHER_SCRIPT_LOG_FILE, 'Thread ' + thread_id + ' fetching stock info for ticker: ' + stock)
 		stock_info = YahooFinancials(stock)
-		if (stock_info is None):
-			log.error(log.FETCHER_SCRIPT_LOG_FILE, 'Unable to store stock information for ticker: ' + stock + ', stock_info is None')
-		elif (stock_info.get_stock_exchange() is None):
-			log.error(log.FETCHER_SCRIPT_LOG_FILE, 'Unable to store stock information for ticker: ' + stock + ', stock exchange is None')
-		else:
+		stock_exchange = ''
+		try:
+			stock_exchange = stock_info.get_stock_exchange()
+		except Exception as e:
+			log.error(log.FETCHER_SCRIPT_LOG_FILE, 'Thread ' + thread_id + ' was unable to store stock information for ticker: ' + stock + ', failed to resolve stock exchange')
+			log.error(log.FETCHER_SCRIPT_LOG_FILE, 'Exception: ' + str(e))
+
+		if (stock_exchange != ''):
 			handle_stock_info(db, stock, stock_info)
 
 def fetch_and_handle_index_info(thread_id, db, indices):
 	for index in indices:
 		log.info(log.FETCHER_SCRIPT_LOG_FILE, 'Thread ' + thread_id + ' fetching info for index: ' + index)
 		index_info = YahooFinancials(index)
-		if (index_info is None):
-			log.error(log.FETCHER_SCRIPT_LOG_FILE, 'Unable to store index information for: ' + index + ', index_info is None')
-		elif (index_info.get_stock_exchange() is None):
-			log.error(log.FETCHER_SCRIPT_LOG_FILE, 'Unable to store index information for: ' + index + ', stock exchange is None')
-		else:
+		stock_exchange = ''
+		try:
+			stock_exchange = stock_info.get_stock_exchange()
+		except Exception as e:
+			log.error(log.FETCHER_SCRIPT_LOG_FILE, 'Thread ' + thread_id + ' was unable to store index information for: ' + index + ', failed to resolve index exchange')
+			log.error(log.FETCHER_SCRIPT_LOG_FILE, 'Exception: ' + str(e))
+
+		if (stock_exchange != ''):
 			handle_index_info(db, index, index_info)
 
 def do_stock_info_fetching(thread_id, stocks):
