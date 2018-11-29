@@ -20,8 +20,40 @@ price_rows = dbhandler.fetch_price_rows_for_stock(db, stock)
 if (price_rows is None):
 	log.warning(log.PREDICTOR_SCRIPT_LOG_FILE, 'No prices exists for stock: ' + stock)
 else:
-	for price_row in price_rows:
+	dict = {}
+	for price_row in price_rows: # One row equals one day of prices
+		dict[price_row[0]] = price_row[6].split(';')
 		log.info(log.PREDICTOR_SCRIPT_LOG_FILE, str(price_row[0]) + " " + str(price_row[1]) + " " + str(price_row[2]) + " " + str(price_row[3]) + " " + str(price_row[4]) + " " + str(price_row[5]) + " " + str(price_row[6]))
+
+	data = pd.DataFrame({ key:pd.Series(value) for key, value in dict.items() })
+	print(data)
+
+	# Dimensions of dataset
+	n = data.shape[0]
+	p = data.shape[1]
+
+	# Make data a np.array
+	data = data.values
+
+	# Training and test data
+	train_start = 0
+	train_end = int(np.floor(0.8*n))
+	test_start = train_end + 1
+	test_end = n
+	data_train = data[np.arange(train_start, train_end), :]
+	data_test = data[np.arange(test_start, test_end), :]
+
+	# Scale data
+	scaler = MinMaxScaler(feature_range=(-1, 1))
+	scaler.fit(data_train)
+	data_train = scaler.transform(data_train)
+	data_test = scaler.transform(data_test)
+
+	# Build X and y
+	#X_train = data_train[:, 1:]
+	#y_train = data_train[:, 0]
+	#X_test = data_test[:, 1:]
+	#y_test = data_test[:, 0]
 
 dbhandler.close_connection_to_database(MAIN_THREAD, db)
 
