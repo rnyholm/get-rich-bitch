@@ -100,16 +100,16 @@ def store_stock_prices(db, stock, stock_info):
 	sql = "SELECT * FROM stocks s JOIN prices p ON s.ticker = p.ticker WHERE s.ticker = '{}' AND p.date LIKE '{}'".format(stock, localtime.get_timestamp_for_sql_select())
 	number_of_prices = execute_sql_with_logging(cursor, sql)
 	if (number_of_prices == 0): # Doesn't exist any prices, insert fresh ones
-		sql = "INSERT INTO prices (ticker, date, previousclose, open, daytrend) VALUES('{}', '{}', {}, {}, '{}')" \
-		.format(stock, localtime.get_timestamp_for_sql_insert(), stock_info.get_prev_close_price(), stock_info.get_open_price(), stock_info.get_current_price())
+		sql = "INSERT INTO prices (ticker, date, previousclose, open, low, high, volume, daytrend) VALUES('{}', '{}', {}, {}, {}, {}, '{}', '{}')" \
+		.format(stock, localtime.get_timestamp_for_sql_insert(), stock_info.get_prev_close_price(), stock_info.get_open_price(), stock_info.get_daily_low(), stock_info.get_daily_high(), stock_info.get_current_volume(), stock_info.get_current_price())
 		execute_sql_with_logging(cursor, sql)
 		db.commit()
 	elif (number_of_prices == 1): # Update prices
 		stock_and_prices_result = cursor.fetchall()
 		stock_and_prices = stock_and_prices_result[0] # Should be exactly one!
-		daytrend =  str(stock_and_prices[9]) + ';{}'.format(stock_info.get_current_price())
-		sql = "UPDATE prices SET date = '{}', previousclose = {}, open = {}, daytrend = '{}' WHERE id = {}"	\
-		.format(localtime.get_timestamp_for_sql_insert(), stock_info.get_prev_close_price(), stock_info.get_open_price(), daytrend, stock_and_prices[3])
+		daytrend =  str(stock_and_prices[12]) + ';{}'.format(stock_info.get_current_price())
+		sql = "UPDATE prices SET date = '{}', previousclose = {}, open = {}, low = {}, high = {}, volume = '{}', daytrend = '{}' WHERE id = {}"	\
+		.format(localtime.get_timestamp_for_sql_insert(), stock_info.get_prev_close_price(), stock_info.get_open_price(), stock_info.get_daily_low(), stock_info.get_daily_high(), stock_info.get_current_volume(), daytrend, stock_and_prices[3])
 		execute_sql_with_logging(cursor, sql)
 		db.commit()
 	else: # This is wrong, we should only have exactly one result row
@@ -152,16 +152,16 @@ def store_index_prices(db, index, index_info):
 	sql = "SELECT * FROM indices i JOIN prices p ON i.index = p.index WHERE i.index = '{}' AND p.date LIKE '{}'".format(index, localtime.get_timestamp_for_sql_select())
 	number_of_prices = execute_sql_with_logging(cursor, sql)
 	if (number_of_prices == 0): # Doesn't exist any prices, insert fresh ones
-		sql = "INSERT INTO prices (`index`, date, previousclose, open, daytrend) VALUES('{}', '{}', {}, {}, '{}')" \
-		.format(index, localtime.get_timestamp_for_sql_insert(), index_info.get_prev_close_price(), index_info.get_open_price(), index_info.get_current_price())
+		sql = "INSERT INTO prices (`index`, date, previousclose, open, low, high, volume, daytrend) VALUES('{}', '{}', {}, {}, {}, {}, '{}', '{}')" \
+		.format(index, localtime.get_timestamp_for_sql_insert(), index_info.get_prev_close_price(), index_info.get_open_price(), index_info.get_daily_low(), index_info.get_daily_high(), index_info.get_current_volume(), index_info.get_current_price())
 		execute_sql_with_logging(cursor, sql)
 		db.commit()
 	elif (number_of_prices == 1): # Update prices
 		index_and_prices_result = cursor.fetchall()
 		index_and_prices = index_and_prices_result[0] # Should be exactly one!
-		daytrend =  str(index_and_prices[8]) + ';{}'.format(index_info.get_current_price())
-		sql = "UPDATE prices p  SET p.date = '{}', p.previousclose = {}, p.open = {}, p.daytrend = '{}' WHERE id = {}"     \
-		.format(localtime.get_timestamp_for_sql_insert(), index_info.get_prev_close_price(), index_info.get_open_price(), daytrend, index_and_prices[2])
+		daytrend =  str(index_and_prices[11]) + ';{}'.format(index_info.get_current_price())
+		sql = "UPDATE prices p  SET p.date = '{}', p.previousclose = {}, p.open = {}, p.low = {}, p.high = {}, p.volume = '{}', p.daytrend = '{}' WHERE id = {}"     \
+		.format(localtime.get_timestamp_for_sql_insert(), index_info.get_prev_close_price(), index_info.get_open_price(), index_info.get_daily_low(), index_info.get_daily_high(), index_info.get_current_volume(), daytrend, index_and_prices[2])
 		execute_sql_with_logging(cursor, sql)
 		db.commit()
 	else: # This is wrong, we should only have exactly one result row

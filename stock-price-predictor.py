@@ -7,7 +7,10 @@ import dbhandler
 import tensorflow as tf
 import numpy as np
 import pandas as pd
+import matplotlib as mpl
+mpl.use('Agg')
 import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 
 MAIN_THREAD = 't0_predictor_main'
@@ -22,16 +25,31 @@ if (price_rows is None):
 else:
 	dict = {}
 	for price_row in price_rows: # One row equals one day of prices
-		dict[price_row[0]] = price_row[6].split(';')
-		log.info(log.PREDICTOR_SCRIPT_LOG_FILE, str(price_row[0]) + " " + str(price_row[1]) + " " + str(price_row[2]) + " " + str(price_row[3]) + " " + str(price_row[4]) + " " + str(price_row[5]) + " " + str(price_row[6]))
+		dict[price_row[0]] = price_row[9].split(';')
+		log.info(log.PREDICTOR_SCRIPT_LOG_FILE, str(price_row[0]) + " " + str(price_row[1]) + " " + str(price_row[2]) + " " + str(price_row[3]) + " " + str(price_row[4]) + " " + str(price_row[5]) + " " + str(price_row[6])  + " " + str(price_row[7]) + " " + str(price_row[8])  + " " + str(price_row[9]))
 
 	data = pd.DataFrame({ key:pd.to_numeric(pd.Series(value), errors='coerce') for key, value in dict.items() })
 	print(data)
 	print(data.dtypes)
+'''
+	# Dimensions of dataset
+	rows = data.shape[0] # Rows
+	columns = data.shape[1] # Columns
+	print "rows: " + str(rows)
+	print "columns: " + str(columns)
+
+	X_train, X_test, y_train, y_test = train_test_split(data.iloc[:,0:columns], data.iloc[:,0:rows], test_size=0.33, random_state=0)
+	print "X_train: " + str(X_train)
+	print "y_train: " + str(y_train)
+	print "X_test: " + str(X_test)
+	print "y_test: " + str(y_test)
 
 	# Dimensions of dataset
-	n = data.shape[0]
-	p = data.shape[1]
+	n = data.shape[0] # Rows
+	p = data.shape[1] # Columns
+
+	print "n: " + str(n)
+	print "p: " + str(p)
 
 	# Make data a np.array
 	data = data.values
@@ -41,20 +59,31 @@ else:
 	train_end = int(np.floor(0.8*n))
 	test_start = train_end + 1
 	test_end = n
+	print "train_start: " + str(train_start)
+	print "train_end: " + str(train_end)
+	print "test_start: " + str(test_start)
+	print "test_end: " + str(test_end)
 	data_train = data[np.arange(train_start, train_end), :]
 	data_test = data[np.arange(test_start, test_end), :]
+	print "data_train: " + str(data_train)
+	print "data_test: " + str(data_test)
 
 	# Scale data
-	scaler = MinMaxScaler(feature_range=(-1, 1))
-	scaler.fit(data_train)
-	data_train = scaler.transform(data_train)
-	data_test = scaler.transform(data_test)
+	#scaler = MinMaxScaler(feature_range=(-1, 1))
+	#scaler.fit(data_train)
+	#data_train = scaler.transform(data_train)
+	#data_test = scaler.transform(data_test)
 
 	# Build X and y
 	X_train = data_train[:, 1:]
 	y_train = data_train[:, 0]
 	X_test = data_test[:, 1:]
 	y_test = data_test[:, 0]
+
+	print "X_train: " + str(X_train)
+	print "y_train: " + str(y_train)
+	print "X_test: " + str(X_test)
+	print "y_test: " + str(y_test)
 
 	# Number of stocks in training data
 	n_stocks = X_train.shape[1]
@@ -110,12 +139,11 @@ else:
 	net.run(tf.global_variables_initializer())
 
 	# Setup plot
-	#plt.ion()
-	#fig = plt.figure()
-	#ax1 = fig.add_subplot(111)
-	#line1, = ax1.plot(y_test)
-	#line2, = ax1.plot(y_test * 0.5)
-	#plt.show()
+	plt.ion()
+	fig = plt.figure()
+	ax1 = fig.add_subplot(111)
+	line1, = ax1.plot(y_test)
+	line2, = ax1.plot(y_test * 0.5)
 
 	# Fit neural net
 	batch_size = 2 #256
@@ -148,10 +176,12 @@ else:
 				# Prediction
 				pred = net.run(out, feed_dict={X: X_test})
 				print('Prediction: ' + str(pred))
-				#line2.set_ydata(pred)
-				#plt.title('Epoch ' + str(e) + ', Batch ' + str(i))
-				#plt.pause(0.01)
+				line2.set_ydata(pred)
+				plt.title('Epoch ' + str(e) + ', Batch ' + str(i))
+				plt.pause(0.01)
 
+	fig.savefig('test.png')
+'''
 dbhandler.close_connection_to_database(MAIN_THREAD, db)
 
 # Do some tensorflowstuff, just for fun
